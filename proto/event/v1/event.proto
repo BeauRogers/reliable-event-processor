@@ -1,0 +1,56 @@
+syntax = "proto3";
+
+package event.v1;
+
+import "google/protobuf/timestamp.proto";
+
+enum EventStatus {
+  EVENT_STATUS_UNSPECIFIED = 0;
+  EVENT_STATUS_RECEIVED = 1;
+  EVENT_STATUS_PROCESSING = 2;
+  EVENT_STATUS_SUCCEEDED = 3;
+  EVENT_STATUS_FAILED = 4;
+  EVENT_STATUS_DEAD_LETTERED = 5;
+}
+
+//filled out and sent back by server
+message Event {
+  string event_id = 1;          // server-assigned UUID
+  string idempotency_key = 2;   // client or upstream supplied
+  string type = 3;
+  bytes payload = 4;
+  EventStatus status = 5;
+  int32 attempt_count = 6;
+  string last_error = 7;
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp updated_at = 9;
+}
+
+//Client side send
+message IngestEventRequest {
+  string idempotency_key = 1;
+  string type = 2;
+  bytes payload = 3;
+}
+
+//server response
+message IngestEventResponse {
+  Event event = 1;
+  bool duplicate = 2;           // true if this idempotency_key already existed
+}
+
+//Client side send
+message GetEventRequest {
+  string event_id = 1;
+}
+
+//These functions are the default implementation but are overriden as if they were 'virtual' functions in the actual implementation
+service EventService {
+  rpc IngestEvent(IngestEventRequest) returns (IngestEventResponse);
+  rpc GetEvent(GetEventRequest) returns (Event);
+}
+
+
+//Personal notes:
+//The client will send an event request with a payload of informatoin for the specific eventm idempotency_key and a type describing the message
+//The server will process the event and send back various fields the event will indicate
