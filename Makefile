@@ -1,4 +1,4 @@
-.PHONY: gen-proto db-up db-down run test
+.PHONY: gen-proto db-up db-down run test worker
 
 gen-proto:
 	python3 -m grpc_tools.protoc \
@@ -19,3 +19,6 @@ run:
 
 test:
 	PYTHONPATH=gen:src python3 src/client.py
+
+worker:
+	PYTHONPATH=gen:src python3 src/worker.py
