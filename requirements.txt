@@ -1,4 +1,7 @@
 grpcio==1.71.0
 grpcio-tools==1.71.0
+# Provides google.api.annotations_pb2, imported by the regenerated stubs now
+# that event.proto carries google.api.http annotations.
+googleapis-common-protos==1.66.0
 psycopg[binary]==3.2.4
 psycopg-pool==3.2.4

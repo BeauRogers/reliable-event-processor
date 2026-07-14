@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package event.v1;
 
+import "google/api/annotations.proto";
 import "google/protobuf/timestamp.proto";
 
 enum EventStatus {
@@ -46,11 +47,24 @@ message GetEventRequest {
 
 //These functions are the default implementation but are overriden as if they were 'virtual' functions in the actual implementation
 service EventService {
-  rpc IngestEvent(IngestEventRequest) returns (IngestEventResponse);
-  rpc GetEvent(GetEventRequest) returns (Event);
+  rpc IngestEvent(IngestEventRequest) returns (IngestEventResponse) {
+    // Envoy's transcoder reads this: POST /v1/events with the whole JSON body
+    // mapped onto IngestEventRequest. Inert for the Python server itself.
+    option (google.api.http) = {
+      post: "/v1/events" 
+      body: "*"
+    };
+  }
+
+  rpc GetEvent(GetEventRequest) returns (Event) {
+    // {event_id} binds the URL path segment to GetEventRequest.event_id.
+    option (google.api.http) = {
+      get: "/v1/events/{event_id}"
+    };
+  }
 }
 
 
 //Personal notes:
-//The client will send an event request with a payload of informatoin for the specific eventm idempotency_key and a type describing the message
+//The client will send an event request with a payload of information for the specific event idempotency_key and a type describing the message
 //The server will process the event and send back various fields the event will indicate

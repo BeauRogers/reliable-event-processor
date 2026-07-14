@@ -9,3 +9,44 @@ services:
       - "5432:5432"
     volumes:
       - ./migrations/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    # The Python services open their connection pools at startup, so they must
+    # wait until Postgres actually accepts connections, not just until the
+    # container exists.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U events -d events"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  grpc-server:
+    build: .
+    command: python src/server.py
+    environment:
+      # Compose service name, not localhost: inside a container localhost is
+      # the container itself. Host runs still default to localhost via config.py.
+      DATABASE_URL: postgresql://events:events@postgres:5432/events
+    ports:
+      - "50051:50051"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  worker:
+    build: .
+    command: python src/worker.py
+    environment:
+      DATABASE_URL: postgresql://events:events@postgres:5432/events
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  envoy:
+    image: envoyproxy/envoy:v1.31-latest
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./envoy/envoy.yaml:/etc/envoy/envoy.yaml:ro
+      # Build artifact: run `make gen-descriptor` before bringing this up.
+      - ./envoy/descriptor.pb:/etc/envoy/descriptor.pb:ro
+    depends_on:
+      - grpc-server

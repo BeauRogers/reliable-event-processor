@@ -1,0 +1,61 @@
+# Envoy fronting the gRPC server: listens for plain JSON/HTTP on 8080 and
+# transcodes to gRPC calls against the grpc-server compose service on 50051.
+static_resources:
+  listeners: #Where to listen
+    - name: listener_0
+      address:
+        socket_address: { address: 0.0.0.0, port_value: 8080 }
+      filter_chains: #What to do with requests
+        - filters:
+            - name: envoy.filters.network.http_connection_manager
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                stat_prefix: ingress_http
+                route_config:
+                  name: local_route
+                  virtual_hosts:
+                    - name: local_service
+                      domains: ["*"]
+                      routes:
+                        - match: { prefix: "/" }
+                          route:
+                            cluster: grpc_backend
+                            timeout: 10s
+                http_filters:
+                  - name: envoy.filters.http.grpc_json_transcoder
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder
+                      proto_descriptor: /etc/envoy/descriptor.pb
+                      # Must be the fully qualified name (package + service);
+                      # a bare "EventService" makes every route 404.
+                      services:
+                        - event.v1.EventService
+                      print_options:
+                        add_whitespace: true
+                        # Emit zero values / empty strings instead of omitting them.
+                        always_print_primitive_fields: true
+                        # JSON uses idempotency_key, matching the proto, rather
+                        # than the default lowerCamelCase idempotencyKey.
+                        preserve_proto_field_names: true
+                  - name: envoy.filters.http.router
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+
+  clusters:
+    - name: grpc_backend
+      type: STRICT_DNS #check for hostname via DNS in the docker container every few seconds in case of a change
+      lb_policy: ROUND_ROBIN # not needed for our purposes, but a default values is required
+      # gRPC upstreams speak HTTP/2; without this the connection fails.
+      typed_extension_protocol_options:
+        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+          explicit_http_config:
+            http2_protocol_options: {} #gRPC only works over HTTP/2. This would fail silently without this
+      load_assignment: #This is where we are sending everything
+        cluster_name: grpc_backend
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    # docker-compose service name, resolved by Docker DNS.
+                    socket_address: { address: grpc-server, port_value: 50051 }

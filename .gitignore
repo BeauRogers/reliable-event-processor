@@ -1,0 +1,7 @@
+# Build artifacts: regenerate with `make gen-proto` and `make gen-descriptor`.
+gen/
+envoy/descriptor.pb
+
+__pycache__/
+.DS_Store
+.env
