@@ -128,7 +128,7 @@ def serve():
     pool = ConnectionPool(
         conninfo=config.DATABASE_URL,
         min_size=1,
-        max_size=10,
+        max_size=10,#we have up to 10 threads that can run
         kwargs={"autocommit": True},
         open=True,
     )

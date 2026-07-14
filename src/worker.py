@@ -28,15 +28,14 @@ CLAIM_SQL = """
 MARK_PROCESSING_SQL = """
     UPDATE events
     SET status = 'PROCESSING',
-        attempt_count = attempt_count + 1,
-        updated_at = now()
+        attempt_count = attempt_count + 1
     WHERE id = %s
     RETURNING attempt_count
 """
 
 MARK_SUCCEEDED_SQL = """
     UPDATE events
-    SET status = 'SUCCEEDED', updated_at = now()
+    SET status = 'SUCCEEDED'
     WHERE id = %s
 """
 
@@ -45,8 +44,7 @@ MARK_FAILED_SQL = """
     UPDATE events
     SET status = %s,
         last_error = %s,
-        next_attempt_at = %s,
-        updated_at = now()
+        next_attempt_at = %s
     WHERE id = %s
 """
 
@@ -66,7 +64,7 @@ def process_one(pool: ConnectionPool) -> bool:
     # Transaction 1: atomically claim the event and transition to PROCESSING.
     # SKIP LOCKED means a second worker will skip this row rather than block.
     with pool.connection() as conn:
-        with conn.transaction():
+        with conn.transaction(): #Here we are going to BEGIN our transactionand claim our log on the event.
             with conn.cursor() as cur:
                 cur.execute(CLAIM_SQL)
                 row = cur.fetchone()
@@ -77,8 +75,8 @@ def process_one(pool: ConnectionPool) -> bool:
                 cur.execute(MARK_PROCESSING_SQL, (event_id,))
                 (new_attempt_count,) = cur.fetchone()
 
-    if event_id is None:
-        return False
+    if event_id is None: 
+        return False #we didn't process anything, we can exit
 
     print(f"[worker] claimed event_id={event_id} attempt={new_attempt_count}", flush=True)
 
