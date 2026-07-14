@@ -3,7 +3,7 @@ This project is a demo project for learning purposes. This project demonstrates 
 
 
 # Architecture #
-This project is composes of four services
+This project is composed of four services
 
 ## PostGres ##
 This is the database that contains the information of the events. The information that is stored in the database is:
